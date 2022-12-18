@@ -1,7 +1,8 @@
 chat/static
 chat/templates
 new/
-
+mongo/
+concurrents/
 
 
 .vscode

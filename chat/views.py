@@ -31,10 +31,12 @@ from django.contrib.auth import authenticate, login, logout
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.contrib.auth import  get_user_model
-
+from rest_framework.exceptions import ValidationError
 class Login(APIView):
     def post(self, request, format=None):
-        username = request.data.get("username")
+        username = request.data.get("username", None)
+        if username is None:
+            raise ValidationError("username is requierd !")
         user = get_user_model().objects.get(username=username)
         if user is not None:
             login(request, user)

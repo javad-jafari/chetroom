@@ -2,12 +2,14 @@ import json
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
 from .models import Room, Message
-
+from .serializers import MesssageSerializer
 
 
 class PublicGroupConsumer(WebsocketConsumer):
 
-    messages = [{"msg":"hello","user":"username 1"}, {"msg":"how are you ?","user":"username 2"}]
+
+    def get_current_user(self):
+        return self.scope["user"]
 
     def _check_user(self):
         return self.scope["user"].is_authenticated
@@ -33,12 +35,17 @@ class PublicGroupConsumer(WebsocketConsumer):
             },
         )
     
+    def get_old_message(self):
+        msgs = Message.objects.filter(room=self.channel_name)
+        return MesssageSerializer().data
+
     def chat_old_msg(self):
-        async_to_sync(self.channel_layer.group_send)(
-                "echo",
+        print(self.channel_name)
+        async_to_sync(self.channel_layer.send)(
+                self.channel_name,
                 {
                     "type": "chat.old.msg",
-                    "text": self.messages
+                    "text": "111111111111111111"
                 },
             )
     
@@ -65,7 +72,7 @@ class PublicGroupConsumer(WebsocketConsumer):
                 "echo",
                 {
                     "type" : "chat.online.users",
-                    "text":self.scope["user"].username
+                    "text":Room.objects.get(name="echo").get_online_users()
                 }
             )
     
@@ -74,6 +81,15 @@ class PublicGroupConsumer(WebsocketConsumer):
                 "echo",
                 self.channel_name
             )
+        obj,_=Room.objects.get_or_create(name='echo')
+        obj.join(self.get_current_user())
+
+    def discard_from_group(self):
+        async_to_sync(self.channel_layer.group_discard)(
+                "echo",
+                self.channel_name
+            )
+
 
     command = {
         "chat_message":chat_message, 
@@ -81,7 +97,9 @@ class PublicGroupConsumer(WebsocketConsumer):
         "chat_old_msg":chat_old_msg,
         "chat_user_joined":chat_user_joined,
         "chat_user_left":chat_user_left,
-        "add_to_group":add_to_group
+        "chat_online_users":chat_online_users,
+        "add_to_group":add_to_group,
+        "discard_from_group":discard_from_group,
         }
 
     def connect(self):
@@ -92,14 +110,20 @@ class PublicGroupConsumer(WebsocketConsumer):
             self.command["add_to_group"](self)
             self.command["chat_old_msg"](self)
             self.command["chat_user_joined"](self)
+            self.command["chat_online_users"](self)
 
         else:
             self.disconnect()
     
     
     def disconnect(self, code):
-        self.command["chat_user_left"](self)
-        self.disconnect()
+        if self._check_user():
+            self.command["chat_user_left"](self)
+            self.command["discard_from_group"](self)
+
+        obj=Room.objects.get(name='echo')
+        obj.leave(self.get_current_user())
+        return super().disconnect(code)
     
     def receive(self, text_data=None, bytes_data=None):
 
@@ -157,6 +181,16 @@ class PublicGroupConsumer(WebsocketConsumer):
                 {
                     "type":"chat_user_left",
                     "user":event["text"]
+                }
+            )
+        )
+    def chat_online_users(self,event):
+
+        self.send(
+            text_data=json.dumps(
+                {
+                    "type":"chat_online_users",
+                    "users":event["text"]
                 }
             )
         )

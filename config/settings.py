@@ -35,7 +35,9 @@ INSTALLED_APPS = [
     'user',
     'chat.apps.ChatConfig',
     'channels',
-    'rest_framework.authtoken'
+    'rest_framework.authtoken',
+    'mongo',
+    'concurrents',
 ]
 
 MIDDLEWARE = [
