@@ -2,8 +2,8 @@ import json
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
 from .models import Room, Message
-from .serializers import MesssageSerializer
-
+from .serializers import MesssageSerializer, UserSerializer
+from django.utils import timezone
 
 class PublicGroupConsumer(WebsocketConsumer):
 
@@ -24,6 +24,8 @@ class PublicGroupConsumer(WebsocketConsumer):
                 "user": self.scope["user"].username if self.scope["user"].is_authenticated else None
             },
         )
+        room = Room.objects.get(name="echo")
+        Message.objects.create(user=self.get_current_user(), room = room , content=data['message'], timestamp=timezone.now())
     
     def chat_is_typing(self, data):
 
@@ -36,8 +38,8 @@ class PublicGroupConsumer(WebsocketConsumer):
         )
     
     def get_old_message(self):
-        msgs = Message.objects.filter(room=self.channel_name)
-        return MesssageSerializer().data
+        msgs = Message.objects.filter(room__name="echo")
+        return MesssageSerializer(msgs, many=True).data
 
     def chat_old_msg(self):
         print(self.channel_name)
@@ -45,7 +47,7 @@ class PublicGroupConsumer(WebsocketConsumer):
                 self.channel_name,
                 {
                     "type": "chat.old.msg",
-                    "text": "111111111111111111"
+                    "text": self.get_old_message()
                 },
             )
     
@@ -72,7 +74,7 @@ class PublicGroupConsumer(WebsocketConsumer):
                 "echo",
                 {
                     "type" : "chat.online.users",
-                    "text":Room.objects.get(name="echo").get_online_users()
+                    "text":UserSerializer(Room.objects.get(name="echo").online, many=True).data
                 }
             )
     
@@ -135,8 +137,6 @@ class PublicGroupConsumer(WebsocketConsumer):
 
     
     def chat_message(self, event):
-        forward_msg = {"msg":event["text"] ,'user':event["user"]}
-        self.messages.append(forward_msg)
 
         self.send(text_data=json.dumps(
             {

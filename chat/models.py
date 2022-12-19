@@ -1,6 +1,5 @@
 from django.contrib.auth import get_user_model  
 from django.db import models
-from .serializers import UserSerializer
 
 
 
@@ -29,9 +28,6 @@ class Room(models.Model):
         self.online.remove(user)
         self.save()
     
-    def get_online_users(self):
-        users = UserSerializer(self.online, many=True).data
-        return users
 
 
     def __str__(self):
